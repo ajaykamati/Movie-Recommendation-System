@@ -1,0 +1,7 @@
+exit
+xTMDB_movie_dataset_v11.csv
+*.pkl
+__pycache__/
+*.pyc
+.DS_Store
+
