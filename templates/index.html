@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Recommendation System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <h1 class="logo">MRS</h1>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="hero-content">
+            <h1 class="hero-title">Find Your Next Movie</h1>
+            <p class="hero-subtitle">Powered by advanced machine learning clustering.</p>
+
+            <div class="search-container">
+                <form id="recommendForm" class="search-box">
+                    <input type="text" id="movieInput" name="movie_name"
+                        placeholder="Enter a movie name (e.g. Inception)" required autocomplete="off"
+                        list="movie-titles">
+                    <datalist id="movie-titles"></datalist>
+                    <button type="submit" class="btn-primary" id="recommendBtn">
+                        <span class="btn-text">Recommend</span>
+                        <div class="spinner" id="btnSpinner"></div>
+                    </button>
+                </form>
+            </div>
+
+            <div id="error-message" class="error-msg hidden"></div>
+        </div>
+    </header>
+
+    <main class="recommendations-section" id="popularSection">
+        <h2 class="section-title">Popular Movies in Dataset</h2>
+        <div class="grid-container" id="popularGrid">
+            <!-- Cards will be injected here via JS -->
+            <div class="spinner" id="popularSpinner" style="display: block; margin: 0 auto;"></div>
+        </div>
+    </main>
+
+    <main class="recommendations-section hidden" id="recommendationsSection">
+        <h2 class="section-title">Recommended for You</h2>
+        <div class="grid-container" id="moviesGrid">
+            <!-- Cards will be injected here via JS -->
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; <span id="year"></span> Movie Recommendation System</p>
+        <p class="developer">Developed internally.</p>
+    </footer>
+
+    <script>
+        document.getElementById('year').textContent = new Date().getFullYear();
+
+        const form = document.getElementById('recommendForm');
+        const errorMsg = document.getElementById('error-message');
+        const resultsSection = document.getElementById('recommendationsSection');
+        const grid = document.getElementById('moviesGrid');
+        const btnText = document.querySelector('.btn-text');
+        const btnSpinner = document.getElementById('btnSpinner');
+        const submitBtn = document.getElementById('recommendBtn');
+
+        // Fetch autocomplete datalist
+        fetch('/autocomplete')
+            .then(res => res.json())
+            .then(data => {
+                const dataList = document.getElementById('movie-titles');
+                data.forEach(title => {
+                    const option = document.createElement('option');
+                    option.value = title;
+                    dataList.appendChild(option);
+                });
+            })
+            .catch(err => console.error("Error fetching autocomplete:", err));
+
+        // Fetch popular movies
+        fetch('/popular')
+            .then(res => res.json())
+            .then(data => {
+                const popularGrid = document.getElementById('popularGrid');
+                document.getElementById('popularSpinner').style.display = 'none';
+                if (data.popular) {
+                    renderMovies(data.popular, popularGrid, false);
+                }
+            })
+            .catch(err => {
+                console.error("Error fetching popular movies:", err);
+                document.getElementById('popularSpinner').style.display = 'none';
+            });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const movieName = document.getElementById('movieInput').value.trim();
+            if (!movieName) return;
+
+            // Reset UI
+            errorMsg.classList.add('hidden');
+            resultsSection.classList.add('hidden');
+            grid.innerHTML = '';
+
+            // Loading state
+            submitBtn.disabled = true;
+            btnText.style.display = 'none';
+            btnSpinner.style.display = 'inline-block';
+
+            try {
+                const formData = new FormData();
+                formData.append('movie_name', movieName);
+
+                const response = await fetch('/recommend', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Something went wrong');
+                }
+
+                if (data.recommendations && data.recommendations.length > 0) {
+                    renderMovies(data.recommendations, grid, true);
+                    resultsSection.classList.remove('hidden');
+
+                    // Smooth scroll to results
+                    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else {
+                    throw new Error('No recommendations found.');
+                }
+
+            } catch (error) {
+                errorMsg.textContent = error.message;
+                errorMsg.classList.remove('hidden');
+            } finally {
+                // Remove loading state
+                submitBtn.disabled = false;
+                btnText.style.display = 'inline';
+                btnSpinner.style.display = 'none';
+            }
+        });
+
+        function renderMovies(movies, targetGrid, showMatchBadge) {
+            movies.forEach((movie, index) => {
+                const card = document.createElement('div');
+                card.className = 'movie-card';
+                card.style.animationDelay = `${index * 0.1}s`;
+
+                let badgeHTML = '';
+                if (showMatchBadge) {
+                    badgeHTML = `
+                        <div class="card-overlay">
+                            <span class="match-badge">${90 - index * 5}% Match</span>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="card-image-wrapper">
+                        <img src="${movie.poster}" alt="${movie.title} Poster" class="card-image" loading="lazy">
+                        ${badgeHTML}
+                    </div>
+                    <div class="card-content">
+                        <h3 class="card-title">${movie.title}</h3>
+                    </div>
+                `;
+                targetGrid.appendChild(card);
+            });
+        }
+    </script>
+</body>
+
+</html>
