@@ -1,7 +1,6 @@
-exit
-xTMDB_movie_dataset_v11.csv
-*.pkl
-__pycache__/
-*.pyc
-.DS_Store
+git add .gitignore
+git commit -m "Removed large dataset file"
+
+
+git push -u origin main
 
